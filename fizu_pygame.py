@@ -76,9 +76,13 @@ game_fps = 60
 Groups of sprites and images to blit, update or something
 """
 all_timers = []
-all_sprites = pg.sprite.Group()
-all_static = pg.sprite.Group()
-all_dynamic = pg.sprite.Group()
+
+all_sprites = pg.sprite.Group() #all sprites that are not hud
+all_static = pg.sprite.Group() #static, like world
+all_dynamic = pg.sprite.Group() #dynamic, like entities
+all_images = pg.sprite.Group() #sprites without any collision, working as images
+all_hud = pg.sprite.Group() #for sprites on canva, not pushed by camera
+all_world = pg.sprite.Group() #for sprites created by ........
 #layers
 #maybe colliders and collidable
 # player, enemies and npcs
@@ -92,6 +96,9 @@ all_dynamic = pg.sprite.Group()
 # variables to access, but not to change
 camera_off = Vector2(0,0)
 camera_tar = Vector2(0,0)
+
+tile_x = 32
+tile_y = 32
 
 
 
@@ -165,13 +172,13 @@ class Sprite(pg.sprite.Sprite):
         self.start_pos = start_pos
 
         #collision
-        self.image = pg.Surface((20,20)) #size of collision
+        self.image = pg.Surface((tile_x, tile_y)) #size of collision
         self.image.set_colorkey(self.colorkey)
         self.image.fill((0,0,255))
         self.rect = self.image.get_frect(topleft = self.start_pos) #colision
 
         #visual
-        self.sprite = pg.Surface((14,14))
+        self.sprite = pg.Surface((tile_x -6, tile_y -6))
         self.sprite.fill((255,255,255))
         self.v_off = Vector2(3,3)
 
@@ -196,10 +203,7 @@ class Sprite(pg.sprite.Sprite):
 
     def remove(self):
         all_sprites.remove(self)
-        if all_static.has(self):
-            all_static.remove(self)
-        if all_dynamic.has(self):
-            all_dynamic.remove(self)
+
     
     def mouse_in_rect(self):
         if self.rect.collidepoint(mouse_global_position()):
@@ -218,6 +222,10 @@ class StaticBody(Sprite):
     def __init__(self, start_pos=(0, 0)):
         super().__init__(start_pos)
         all_static.add(self)
+
+    def remove(self):
+        all_sprites.remove(self)
+        all_static.remove(self)
 
 
 
@@ -283,8 +291,108 @@ class DynamicBody(Sprite):
         self._movement_y_axis(dt)
         self._y_axis_collision()
 
+    def remove(self):
+        all_sprites.remove(self)
+        all_dynamic.remove(self)
 
 
+
+
+
+class HUD_Sprite(pg.sprite.Sprite):
+    def __init__(self, start_pos = (0,0)):
+        super().__init__()
+        all_hud.add(self)
+        self.layer_blit = 0
+        self.colorkey = (0,0,0)
+        self.start_pos = start_pos
+
+        #collision
+        self.image = pg.Surface((tile_x, tile_y)) #size of collision
+        self.image.set_colorkey(self.colorkey)
+        self.image.fill((0,0,255))
+        self.rect = self.image.get_frect(topleft = self.start_pos) #colision
+
+        #visual
+        self.sprite = pg.Surface((tile_x - 10, tile_y - 10))
+        self.sprite.fill((0,255,0))
+        self.v_off = Vector2(5,5)
+
+        #variables that always needed to be updated, like center of sprite for camera
+        self.center = self.rect.center
+
+
+        self.init()
+
+    def init(self):
+        pass
+
+
+#TODO later add something about animation
+
+    def update(self):
+        pass
+
+    def _update(self, dt):
+        self.center = self.rect.center
+        self.update()
+
+    def remove(self):
+        all_hud.remove(self)
+
+    
+    def mouse_in_rect(self):
+        if self.rect.collidepoint(mouse_local_position()):
+            return True
+        else:
+            return False
+
+
+class Image(pg.sprite.Sprite):
+    def __init__(self, start_pos = (0,0)):
+        super().__init__()
+        all_sprites.add(self)
+        all_images.add(self)
+        self.layer_blit = 0
+        self.colorkey = (0,0,0)
+        self.start_pos = start_pos
+
+        #for image
+        self.image = pg.Surface((tile_x, tile_y))
+        self.image.set_colorkey(self.colorkey)
+        self.image.fill((255,0,0))
+        self.rect = self.image.get_frect(topleft = self.start_pos)
+
+
+        #variables that always needed to be updated, like center of sprite for camera
+        self.center = self.rect.center
+
+
+        self.init()
+
+    def init(self):
+        pass
+
+
+#TODO later add something about animation
+
+    def update(self):
+        pass
+
+    def _update(self, dt):
+        self.center = self.rect.center
+        self.update()
+
+    def remove(self):
+        all_images.remove(self)
+        all_sprites.remove(self)
+
+    
+    def mouse_in_rect(self):
+        if self.rect.collidepoint(mouse_local_position()):
+            return True
+        else:
+            return False
 
 
 
@@ -323,6 +431,37 @@ class Timer():
             if timer is self:
                 all_timers.pop(all_timers.index(self))
 
+
+
+class World():
+    def __init__(self):
+        pass
+
+    def read_world(self):
+        pass
+        #return world
+
+    def create_world(self):
+        pass
+
+    def destroy_world(self):
+        pass
+
+    #some kind of dictonary that would have classes without objects.
+    """
+    Something like:
+    "x012 = Wall
+    "kf01 = Door
+    """
+    
+    """
+    based on its neighbours it could have a different sprite
+    """
+
+    #function io reading that would take a string path and return a world informations, probably json file
+    #function that based on the latest function would create a world based on layers and what was needed
+
+
     
 
 class Camera():
@@ -350,9 +489,13 @@ class Camera():
         l_sprites = all_sprites.sprites()
         l_sprites.sort(key = lambda layer: layer.layer_blit)
         for sprite in l_sprites:
+            #collisions
             blit_screen.blit(sprite.image, sprite.rect.topleft - camera_off)
+            #images
             blit_screen.blit(\
                 sprite.sprite, sprite.rect.topleft + sprite.v_off - camera_off)
+        for huds in all_hud:
+            blit_screen.blit(huds.sprite, huds.rect.topleft + huds.v_off)
 
 """
 Main class with a game loop inside
